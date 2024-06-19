@@ -95,31 +95,14 @@ tt = TextTilingTokenizer()
 
 # Chunk the concatenated text
 print("Chunking text...")
+chunks = tt.tokenize(concatenated_text)
+print(f"Chunking complete. Generated {len(chunks)} chunks.")
 
-# Example of splitting text by books for chunking
-def split_by_books(bible_data):
-    books = {}
-    for entry in bible_data:
-        book = entry['book']
-        if book not in books:
-            books[book] = []
-        books[book].append(entry)
-    print(f'{len(books)} books found.')
-    return books
-
-# Split the Bible data by books
-books = split_by_books(bible_data)
-
-# Apply TextTiling to each book separately
-all_chunked_data = []
-for book, book_data in books.items():
-    concatenated_text, verse_map = concatenate_verses(book_data)
-    chunks = tt.tokenize(concatenated_text)
-    chunked_data = map_chunks_to_metadata(chunks, verse_map, concatenated_text)
-    all_chunked_data.extend(chunked_data)
+# Map chunks to metadata
+chunked_bible_data = map_chunks_to_metadata(chunks, verse_map, concatenated_text)
 
 # Print example of chunked data
-for chunk in all_chunked_data[:3]:  # Show first 3 chunks
+for chunk in chunked_bible_data[:3]:  # Show first 3 chunks
     print("Chunk Text:", chunk['text'])
     print("Metadata:", chunk['metadata'])
     print("----")
