@@ -3,7 +3,7 @@ from openai import OpenAI
 from typing import List, Dict, Any
 
 # Initialize OpenAI client
-client = OpenAI(api_key="OPENAI_API_KEY")
+client = OpenAI()
 
 def load_chunks_from_json(file_path: str) -> List[Dict]:
     with open(file_path, 'r', encoding='utf-8') as f:
