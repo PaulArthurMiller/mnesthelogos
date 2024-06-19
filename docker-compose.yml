@@ -1,0 +1,16 @@
+version: '3.5'
+
+services:
+  milvus:
+    image: milvusdb/milvus:v2.2.0
+    container_name: milvus
+    ports:
+      - "19530:19530"
+      - "19121:19121"
+    volumes:
+      - ./volumes:/var/lib/milvus
+    environment:
+      - ETCD_USE_EMBED=true
+      - MINIO_USE_EMBED=true
+      - PULSAR_USE_EMBED=true
+    command: ["milvus", "run", "standalone"]
