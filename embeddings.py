@@ -1,42 +1,50 @@
 import json
-import openai
-from tqdm import tqdm
-import chunk_textiling
 from openai import OpenAI
-client = OpenAI()
+from typing import List, Dict, Any
 
-# Ensure you have your OpenAI API key set up
-def generate_embeddings(text):
+# Initialize OpenAI client
+client = OpenAI(api_key="OPENAI_API_KEY")
+
+def load_chunks_from_json(file_path: str) -> List[Dict]:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def generate_embeddings(text: str) -> List[float]:
     response = client.embeddings.create(
-        input="Your text string goes here",
+        input=text,
         model="text-embedding-3-small"
     )    
     return response.data[0].embedding
 
-def save_chunked_data(filename, chunked_data):
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(chunked_data, f, ensure_ascii=False, indent=4)
+def save_embeddings_to_json(embeddings_data: List[Dict], output_file_path: str):
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        json.dump(embeddings_data, f, ensure_ascii=False, indent=4)
 
-def load_chunked_data(filename):
-    with open(filename, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def main(input_file_path: str, output_file_path: str):
+    # Load chunks from JSON
+    chunks = load_chunks_from_json(input_file_path)
+    
+    embeddings_data = []
+    
+    for chunk in chunks:
+        chunk_text = chunk['chunk_text']
+        metadata = chunk['metadata']
+        
+        # Generate embedding for the chunk
+        embedding = generate_embeddings(chunk_text)
+        
+        # Append embedding and metadata to the list
+        embeddings_data.append({
+            'chunk_text': chunk_text,
+            'metadata': metadata,
+            'embedding': embedding
+        })
+    
+    # Save the embeddings data to JSON
+    save_embeddings_to_json(embeddings_data, output_file_path)
+    print(f"Embeddings saved to {output_file_path}")
 
-# Assuming `chunked_bible_data` is the result from the chunking step
-chunked_bible_data = chunk_textiling.map_chunks_to_metadata(chunks, verse_map, concatenated_text)
-
-# Generate embeddings and add to the chunked data
-for chunk in tqdm(chunked_bible_data, desc="Generating embeddings"):
-    chunk['embedding'] = generate_embeddings(chunk['text'])
-
-# Save the chunked data with embeddings to a file
-save_chunked_data('chunked_bible_data_with_embeddings.json', chunked_bible_data)
-
-# Later, you can load the chunked data and embeddings for further processing
-loaded_chunked_data = load_chunked_data('chunked_bible_data_with_embeddings.json')
-
-# Print example of loaded data
-for chunk in loaded_chunked_data[:3]:  # Show first 3 chunks
-    print("Chunk Text:", chunk['text'])
-    print("Metadata:", chunk['metadata'])
-    print("Embedding:", chunk['embedding'][:10])  # Show first 10 dimensions of the embedding
-    print("----")
+if __name__ == "__main__":
+    input_file_path = 'bible_chunks_nt.json'
+    output_file_path = 'bible_chunks_embeddings_nt.json'
+    main(input_file_path, output_file_path)

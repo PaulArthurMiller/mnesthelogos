@@ -1,117 +1,132 @@
+import json
 import re
-import nltk
-from nltk.tokenize import TextTilingTokenizer
 from tqdm import tqdm
+from typing import List, Dict, Any
 
-nltk.download('punkt')
+def parse_bible_text(file_path: str) -> List[Dict[str, Any]]:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
 
-def parse_bible_text(file_path):
-    print("Parsing Bible text...")
-    with open(file_path, 'r', encoding='utf-8') as file:
-        lines = file.readlines()
-    
-    bible_data = []
+    bible_verses = []
     current_book = ""
     current_chapter = 0
 
+    book_pattern = re.compile(r"^Book (\d+) ([A-Za-z ]+)")
+    verse_pattern = re.compile(r"^(\d{3}):(\d{3}) (.+)$")
+
     for line in lines:
         line = line.strip()
-        # Skip empty lines
-        if not line:
-            continue
-        
-        # Match book names
-        book_match = re.match(r'^Book \d+ (.+)', line)
+        book_match = book_pattern.match(line)
+        verse_match = verse_pattern.match(line)
+
         if book_match:
-            current_book = book_match.group(1)
-            continue
-        
-        # Match verses
-        verse_match = re.match(r'^(\d{3}):(\d{3}) (.+)', line)
-        if verse_match:
-            chapter = int(verse_match.group(1))
-            verse = int(verse_match.group(2))
-            text = verse_match.group(3).strip()
-            
-            bible_data.append({
+            current_book = book_match.group(2)
+            current_chapter = 0
+        elif verse_match:
+            chapter, verse, text = verse_match.groups()
+            chapter = int(chapter)
+            verse = int(verse)
+            if current_chapter != chapter:
+                current_chapter = chapter
+
+            bible_verses.append({
                 'book': current_book,
                 'chapter': chapter,
                 'verse': verse,
-                'text': text
+                'text': text,
+                'start_idx': 0,  # Placeholder, will be set later
+                'end_idx': 0     # Placeholder, will be set later
             })
-    
-    print(f"Parsed {len(bible_data)} verses.")
-    return bible_data
+        else:
+            if bible_verses:
+                # Append to the last verse's text if it's a continuation
+                bible_verses[-1]['text'] += ' ' + line
 
-def concatenate_verses(bible_data):
-    print("Concatenating verses...")
-    concatenated_text = ""
-    verse_map = []
-    
-    for entry in bible_data:
-        verse_text = f"{entry['book']} {entry['chapter']}:{entry['verse']} {entry['text']}"
-        concatenated_text += verse_text + "\n\n"  # Adding paragraph break
-        
-        verse_map.append({
-            'book': entry['book'],
-            'chapter': entry['chapter'],
-            'verse': entry['verse'],
-            'start_idx': len(concatenated_text) - len(verse_text) - 2,  # Adjust for the paragraph break
-            'end_idx': len(concatenated_text)
-        })
-    
-    print("Concatenation complete. Total length:", len(concatenated_text))
-    return concatenated_text.strip(), verse_map
+    return bible_verses
 
-def map_chunks_to_metadata(chunks, verse_map, concatenated_text):
-    print("Mapping chunks to metadata...")
-    chunked_data = []
+def set_indices(verses: List[Dict[str, Any]]) -> None:
+    idx = 0
+    for verse in verses:
+        verse['start_idx'] = idx
+        idx += len(verse['text']) + 1  # +1 for the space added during concatenation
+        verse['end_idx'] = idx - 1
 
-    for i, chunk in enumerate(tqdm(chunks, desc="Mapping chunks")):
-        chunk_metadata = []
-        chunk_start_idx = concatenated_text.find(chunk)
+def concatenate_verses(verses: List[Dict[str, Any]]) -> str:
+    return ' '.join([verse['text'] for verse in verses])
+
+def chunk_text(text: str, max_chunk_size: int = 500) -> List[str]:
+    chunks = []
+    current_chunk = []
+
+    for word in text.split():
+        current_chunk.append(word)
+        if len(' '.join(current_chunk)) >= max_chunk_size:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = []
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return chunks
+
+def map_chunks_to_metadata(chunks: List[str], verses: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    index_mapping = []
+    verse_index = 0
+    chunk_start_idx = 0
+
+    for chunk in chunks:
         chunk_end_idx = chunk_start_idx + len(chunk)
-        
-        for verse in verse_map:
-            if verse['start_idx'] >= chunk_start_idx and verse['end_idx'] <= chunk_end_idx:
-                chunk_metadata.append(verse)
-        
-        chunked_data.append({
-            'text': chunk,
+        chunk_metadata = []
+
+        while verse_index < len(verses) and verses[verse_index]['start_idx'] < chunk_end_idx:
+            verse = verses[verse_index]
+            chunk_metadata.append({
+                'book': verse['book'],
+                'chapter': verse['chapter'],
+                'verse': verse['verse'],
+                'start_idx': verse['start_idx'],
+                'end_idx': verse['end_idx']
+            })
+            verse_index += 1
+
+        index_mapping.append({
+            'chunk_text': chunk,
             'metadata': chunk_metadata
         })
-        
-        # Print out some debugging information
-        if i % 100 == 0:
-            print(f"Chunk {i} start_idx: {chunk_start_idx}, end_idx: {chunk_end_idx}")
-            print("Metadata sample:", chunk_metadata[:3])
-    
-    print("Mapping complete. Total chunks:", len(chunked_data))
-    return chunked_data
+        chunk_start_idx = chunk_end_idx
 
-def print_chunks(chunked_bible_data, positions):
-    for position in positions:
-        chunk = chunked_bible_data[position]
-        print("Chunk Text:", chunk['text'])
-        print("Metadata:", chunk['metadata'])
-        print("----")
+    return index_mapping
 
-# Parse the text file
-bible_data = parse_bible_text('world_english_bible.txt')
+def save_chunks_to_json(chunks_with_metadata: List[Dict[str, Any]], output_file: str):
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(chunks_with_metadata, f, ensure_ascii=False, indent=4)
 
-# Concatenate the verses
-concatenated_text, verse_map = concatenate_verses(bible_data)
+def main():
+    input_file = 'world_english_bible.txt'
+    output_file = 'bible_chunks_nt.json'
 
-# Initialize TextTilingTokenizer
-tt = TextTilingTokenizer()
+    print("Parsing Bible text...")
+    verses = parse_bible_text(input_file)
+    print(f"Parsed {len(verses)} verses.")
 
-# Chunk the concatenated text
-print("Chunking text...")
-chunks = tt.tokenize(concatenated_text)
-print(f"Chunking complete. Generated {len(chunks)} chunks.")
+    print("Setting indices...")
+    set_indices(verses)
 
-# Map chunks to metadata
-chunked_bible_data = map_chunks_to_metadata(chunks, verse_map, concatenated_text)
+    print("Concatenating verses...")
+    concatenated_text = concatenate_verses(verses)
+    print(f"Concatenation complete. Total length: {len(concatenated_text)}")
 
-# Print chunks from the beginning, middle, and end
-print_chunks(chunked_bible_data, [0, len(chunked_bible_data) // 2, -1])
+    print("Chunking text...")
+    chunks = chunk_text(concatenated_text)
+    print(f"Chunking complete. Generated {len(chunks)} chunks.")
+
+    print("Mapping chunks to metadata...")
+    chunks_with_metadata = map_chunks_to_metadata(chunks, verses)
+    print(f"Mapping complete. Total chunks: {len(chunks_with_metadata)}")
+
+    print("Saving chunks to JSON file...")
+    save_chunks_to_json(chunks_with_metadata, output_file)
+    print(f"Chunks saved to {output_file}")
+
+if __name__ == "__main__":
+    main()
