@@ -60,14 +60,14 @@ def concatenate_verses(bible_data):
             'end_idx': len(concatenated_text)
         })
     
-    print("Concatenation complete.")
+    print("Concatenation complete. Total length:", len(concatenated_text))
     return concatenated_text.strip(), verse_map
 
 def map_chunks_to_metadata(chunks, verse_map, concatenated_text):
     print("Mapping chunks to metadata...")
     chunked_data = []
 
-    for chunk in tqdm(chunks, desc="Mapping chunks"):
+    for i, chunk in enumerate(tqdm(chunks, desc="Mapping chunks")):
         chunk_metadata = []
         chunk_start_idx = concatenated_text.find(chunk)
         chunk_end_idx = chunk_start_idx + len(chunk)
@@ -80,9 +80,21 @@ def map_chunks_to_metadata(chunks, verse_map, concatenated_text):
             'text': chunk,
             'metadata': chunk_metadata
         })
+        
+        # Print out some debugging information
+        if i % 100 == 0:
+            print(f"Chunk {i} start_idx: {chunk_start_idx}, end_idx: {chunk_end_idx}")
+            print("Metadata sample:", chunk_metadata[:3])
     
-    print("Mapping complete.")
+    print("Mapping complete. Total chunks:", len(chunked_data))
     return chunked_data
+
+def print_chunks(chunked_bible_data, positions):
+    for position in positions:
+        chunk = chunked_bible_data[position]
+        print("Chunk Text:", chunk['text'])
+        print("Metadata:", chunk['metadata'])
+        print("----")
 
 # Parse the text file
 bible_data = parse_bible_text('world_english_bible.txt')
@@ -101,10 +113,5 @@ print(f"Chunking complete. Generated {len(chunks)} chunks.")
 # Map chunks to metadata
 chunked_bible_data = map_chunks_to_metadata(chunks, verse_map, concatenated_text)
 
-# Print example of chunked data
-for chunk in chunked_bible_data[:3]:  # Show first 3 chunks
-    print("Chunk Text:", chunk['text'])
-    print("Metadata:", chunk['metadata'])
-    print("----")
-
-# This is 'experiment-chunking' branch
+# Print chunks from the beginning, middle, and end
+print_chunks(chunked_bible_data, [0, len(chunked_bible_data) // 2, -1])
