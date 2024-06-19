@@ -106,3 +106,5 @@ for chunk in chunked_bible_data[:3]:  # Show first 3 chunks
     print("Chunk Text:", chunk['text'])
     print("Metadata:", chunk['metadata'])
     print("----")
+
+# This is 'experiment-chunking' branch
