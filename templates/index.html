@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with RAG and GPT-3.5 Turbo</title>
+</head>
+<body>
+    <h1>Chat Interface</h1>
+    <textarea id="prompt" rows="4" cols="50"></textarea><br>
+    <button onclick="sendPrompt()">Send</button>
+    <pre id="response"></pre>
+
+    <script>
+        async function sendPrompt() {
+            const prompt = document.getElementById('prompt').value;
+            const responseElement = document.getElementById('response');
+            responseElement.textContent = 'Loading...';
+
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt }),
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let result = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                result += decoder.decode(value);
+                responseElement.textContent = result;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+Project notes:
+
+6/21/24 - Used Claude to help debug and - wow - that's the way to go. I can see I need to rework my chunk_textiling and embeddings
+    scripts to get the metadata to attach correctly before inserting in the ChromaDB collection. Some metadata is missing, Some
+    seems incorrectly attached. However, the actual embeddings db and simplified search are working well. I'll also want to expand
+    my search options to compare the quality of semantic searches.
