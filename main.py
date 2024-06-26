@@ -54,37 +54,54 @@ feel free to ask!
 def index():
     return render_template('index.html')
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/chat', methods=['GET', 'POST'])
 def chat():
     user_input = request.json.get('prompt', '') if request.json else ''
     if not user_input:
         return jsonify({'error': 'No input provided'}), 400
 
-    # Call RAG setup to search documents
-    rag_response = main(user_input)
-    
-    # Combine user input with RAG response
-    prompt = f"{rag_response}\n\n{user_input}"
+    try:
+        # Call RAG setup to search documents
+        rag_response = main(user_input)
+        
+        # Combine user input with RAG response
+        prompt = f"{rag_response}\n\n{user_input}"
 
-    # Call OpenAI API
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-        {"role": "system", "content": instruction_prompt},
-        {"role": "user", "content": prompt}
-  ],
-        max_tokens=250,
-        n=1,
-        stop=None,
-        temperature=0.7,
-        stream=True  # Enable streaming
-    )
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+            {"role": "system", "content": instruction_prompt},
+            {"role": "user", "content": prompt}
+      ],
+            max_tokens=250,
+            n=1,
+            stop=None,
+            temperature=0.7,
+            stream=True  # Enable streaming
+        )
 
-    def generate():
-        for chunk in response:
-            yield json.dumps(chunk) + '\n'
-    
-    return Response(generate(), content_type='application/json')
+        def generate():
+            try:
+                last_content = ""
+                for chunk in response:
+                    if chunk.choices:
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            new_content = content
+                            yield json.dumps({"content": new_content, "finished": False}) + '\n'
+                            last_content += new_content
+                yield json.dumps({"content": "", "finished": True}) + '\n'
+            except Exception as e:
+                app.logger.error(f"Error in generate function: {str(e)}")
+                yield json.dumps({"error": "An error occurred while generating the response"}) + '\n'
+
+        return Response(generate(), content_type='application/json')
+
+    except Exception as e:
+        app.logger.error(f"An error occurred: {str(e)}")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
 
 @app.route('/api/query', methods=['POST'])
 def api_query():

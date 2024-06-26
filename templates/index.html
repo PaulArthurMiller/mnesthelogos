@@ -4,18 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat with RAG and GPT-3.5 Turbo</title>
+    <style>
+        #chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
     <h1>Chat Interface</h1>
+    <div id="chat-box"></div>
     <textarea id="prompt" rows="4" cols="50"></textarea><br>
     <button onclick="sendPrompt()">Send</button>
-    <pre id="response"></pre>
 
     <script>
         async function sendPrompt() {
             const prompt = document.getElementById('prompt').value;
-            const responseElement = document.getElementById('response');
-            responseElement.textContent = 'Loading...';
+            const chatBox = document.getElementById('chat-box');
+
+            // Display user message
+            chatBox.innerHTML += `<p><strong>You:</strong> ${prompt}</p>`;
+            
+            // Clear the input
+            document.getElementById('prompt').value = '';
+
+            // Add a new paragraph for the assistant's response
+            const assistantParagraph = document.createElement('p');
+            assistantParagraph.innerHTML = '<strong>Assistant:</strong> ';
+            chatBox.appendChild(assistantParagraph);
 
             const response = await fetch('/chat', {
                 method: 'POST',
@@ -27,13 +46,27 @@
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let result = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                result += decoder.decode(value);
-                responseElement.textContent = result;
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const data = JSON.parse(line);
+                            if (!data.finished) {
+                                assistantParagraph.innerHTML += data.content;
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            }
+                        } catch (error) {
+                            console.error('Error parsing JSON:', error);
+                        }
+                    }
+                }
             }
         }
     </script>

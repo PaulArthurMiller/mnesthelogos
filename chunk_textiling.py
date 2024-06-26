@@ -11,7 +11,7 @@ def parse_bible_text(file_path: str) -> List[Dict[str, Any]]:
     current_book = ""
     current_chapter = 0
 
-    book_pattern = re.compile(r"^Book (\d+) ([A-Za-z ]+)")
+    book_pattern = re.compile(r"^(\w+)$")
     verse_pattern = re.compile(r"^(\d{3}):(\d{3}) (.+)$")
 
     for line in lines:
@@ -20,7 +20,7 @@ def parse_bible_text(file_path: str) -> List[Dict[str, Any]]:
         verse_match = verse_pattern.match(line)
 
         if book_match:
-            current_book = book_match.group(2)
+            current_book = book_match.group(1)
             current_chapter = 0
         elif verse_match:
             chapter, verse, text = verse_match.groups()
@@ -37,9 +37,9 @@ def parse_bible_text(file_path: str) -> List[Dict[str, Any]]:
                 'start_idx': 0,  # Placeholder, will be set later
                 'end_idx': 0     # Placeholder, will be set later
             })
-        else:
+        elif current_book and not line.startswith(('Book', '{')):
+            # Append to the last verse's text if it's a continuation
             if bible_verses:
-                # Append to the last verse's text if it's a continuation
                 bible_verses[-1]['text'] += ' ' + line
 
     return bible_verses
