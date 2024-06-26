@@ -4,3 +4,6 @@ Project notes:
     scripts to get the metadata to attach correctly before inserting in the ChromaDB collection. Some metadata is missing, Some
     seems incorrectly attached. However, the actual embeddings db and simplified search are working well. I'll also want to expand
     my search options to compare the quality of semantic searches.
+
+6/26/24 - Claude helped me clean up the main.py, index.html, chunk_textiling, and embeddings scripts. We now have full metadata, 
+    complete verses, with the improved embeddings.
