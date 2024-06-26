@@ -1,17 +1,23 @@
-from flask import Flask, request, jsonify, render_template, Response
+from flask import Flask, request, jsonify, render_template, Response, session
 from typing import Dict, Any
 import openai
 from openai import OpenAI
 import json
 import os
 from rag_setup import main  # Import the search function from your RAG setup
+from flask_session import Session
 
-# Initialize Flask app
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.urandom(24)  # For session encryption
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
 
 # Set up OpenAI API key
 # openai.api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI()
+
+MAX_CONTEXT_LENGTH = 1000  # Adjust based on your needs and model limits
+SUMMARY_THRESHOLD = 1500  # When to summarize
 
 instruction_prompt = """
 You are a knowledgeable and kind assistant specializing in the Bible. When answering
@@ -50,6 +56,15 @@ any other questions or need help with studying the Bible and its applications to
 feel free to ask!
 """
 
+def summarize_conversation(conversation):
+    summary_prompt = f"Summarize the following conversation concisely:\n\n{conversation}"
+    summary_response = client.chat.completions.create(
+        model="gpt-3.5-turbo",  # You can use a smaller model for summarization
+        messages=[{"role": "user", "content": summary_prompt}],
+        max_tokens=100
+    )
+    return summary_response.choices[0].message.content
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -60,6 +75,21 @@ def chat():
     if not user_input:
         return jsonify({'error': 'No input provided'}), 400
 
+    if 'conversation' not in session:
+        session['conversation'] = []
+
+    # Add user input to conversation history
+    session['conversation'].append({"role": "user", "content": user_input})
+
+    # Check if we need to summarize
+    full_conversation = "\n".join([f"{msg['role']}: {msg['content']}" for msg in session['conversation']])
+    if len(full_conversation) > SUMMARY_THRESHOLD:
+        summary = summarize_conversation(full_conversation)
+        session['conversation'] = [{"role": "system", "content": f"Conversation summary: {summary}"}]
+
+    # Prepare context for the current query
+    context = session['conversation'][-MAX_CONTEXT_LENGTH:]
+
     try:
         # Call RAG setup to search documents
         rag_response = main(user_input)
@@ -67,13 +97,12 @@ def chat():
         # Combine user input with RAG response
         prompt = f"{rag_response}\n\n{user_input}"
 
+        messages = [{"role": "system", "content": instruction_prompt}] + context + [{"role": "user", "content": prompt}]
+
         # Call OpenAI API
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-            {"role": "system", "content": instruction_prompt},
-            {"role": "user", "content": prompt}
-      ],
+            messages=messages,
             max_tokens=250,
             n=1,
             stop=None,
@@ -132,3 +161,6 @@ def api_query():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+    # user_input = request.json.get('prompt', '') if request.json else ''
