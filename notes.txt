@@ -7,3 +7,4 @@ Project notes:
 
 6/26/24 - Claude helped me clean up the main.py, index.html, chunk_textiling, and embeddings scripts. We now have full metadata, 
     complete verses, with the improved embeddings.
+6/30/24 - Updated rag_setup.main to return retrieved passages and adjusted main.py to include them in chat and API responses.

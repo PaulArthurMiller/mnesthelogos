@@ -4,7 +4,7 @@ import openai
 from openai import OpenAI
 import json
 import os
-from rag_setup import main  # Import the search function from your RAG setup
+from rag_setup import main as rag_search  # Import the search function from your RAG setup
 from flask_session import Session
 
 app = Flask(__name__)
@@ -92,10 +92,10 @@ def chat():
 
     try:
         # Call RAG setup to search documents
-        rag_response = main(user_input)
-        
-        # Combine user input with RAG response
-        prompt = f"{rag_response}\n\n{user_input}"
+        rag_response = rag_search(user_input)
+
+        # Combine user input with retrieved passages
+        prompt = f"{rag_response}\n\n{user_input}" if rag_response else user_input
 
         messages = [{"role": "system", "content": instruction_prompt}] + context + [{"role": "user", "content": prompt}]
 
@@ -139,10 +139,10 @@ def api_query():
         return jsonify({'error': 'No input provided'}), 400
 
     # Call RAG setup to search documents
-    rag_response = main(user_input)
-    
-    # Combine user input with RAG response
-    prompt = f"{rag_response}\n\n{user_input}"
+    rag_response = rag_search(user_input)
+
+    # Combine user input with retrieved passages
+    prompt = f"{rag_response}\n\n{user_input}" if rag_response else user_input
 
     # Call OpenAI API
     openai_response = client.chat.completions.create(

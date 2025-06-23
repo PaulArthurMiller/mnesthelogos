@@ -31,32 +31,48 @@ def search_similar_chunks(query, collection, top_k=5):
     return results
 
 def main(user_input):
-    # Set up ChromaDB client using the new recommended method
+    """Search for passages similar to ``user_input``.
+
+    Returns a formatted string containing the retrieved passages and
+    their references. If nothing is found an empty string is returned.
+    """
+
+    # Set up ChromaDB client using the recommended method
     client = chromadb.PersistentClient(path="./db")
 
     # Access the existing collection
     collection = client.get_collection(name="bible_embeddings")
 
     # Perform a similarity search
-    query = user_input
-    results = search_similar_chunks(query, collection)
+    results = search_similar_chunks(user_input, collection)
 
-    # Check if results is None or empty
-    if not results or 'documents' not in results or 'metadatas' not in results:
-        print("No results found or unexpected result format.")
-        return
+    # Validate the results structure
+    if (
+        not results
+        or "documents" not in results
+        or "metadatas" not in results
+        or not results["documents"]
+        or not results["documents"][0]
+    ):
+        return ""
 
-    # Check if the expected lists are present and non-empty
-    if not results['documents'] or not results['metadatas']:
-        print("No documents or metadata found in the results.")
-        return
+    passages = []
+    for document, metadata in zip(results["documents"][0], results["metadatas"][0]):
+        book = metadata.get("book", "N/A")
+        chapter = metadata.get("chapter", metadata.get("chapter_start", "N/A"))
 
-    # Print the results
-    for i, (document, metadata) in enumerate(zip(results['documents'][0], results['metadatas'][0])):
-        print(f"Result {i + 1}:")
-        print(f"Document: {document}")
-        print(f"Book: {metadata.get('book', 'N/A')}, Chapter: {metadata.get('chapter', 'N/A')}, Verses: {metadata.get('verses', 'N/A')}")
-        print("\n")        
+        verses = metadata.get("verses")
+        if verses is None:
+            start = metadata.get("verse_start")
+            end = metadata.get("verse_end")
+            if start is not None and end is not None:
+                verses = f"{start}-{end}" if start != end else str(start)
+            else:
+                verses = "N/A"
+
+        passages.append(f"{book} {chapter}:{verses} - {document}")
+
+    return "\n".join(passages)
 
 # if __name__ == "__main__":
 #     main()
